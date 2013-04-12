@@ -1,0 +1,217 @@
+
+<!-- saved from url=(0071)http://media.pragprog.com/titles/csjava/code/collisions/collisions.html -->
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1"></head><body>
+<script src="./collisions_files/Three.js"></script>
+<script src="./collisions_files/Tween.js"></script>
+<script src="./collisions_files/ChromeFixes.js"></script>
+<script>
+  // This is where stuff in our game will happen:
+  var scene = new THREE.Scene();
+
+  // This is what sees the stuff:
+  var aspect_ratio = window.innerWidth / window.innerHeight;
+  var camera = new THREE.PerspectiveCamera(75, aspect_ratio, 1, 10000);
+  camera.position.z = 500;
+  //scene.add(camera);
+
+  // This will draw what the camera sees onto the screen:
+  var renderer = new THREE.WebGLRenderer();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  document.body.appendChild(renderer.domElement);
+
+  // ******** START CODING ON THE NEXT LINE ********
+  var not_allowed = [];
+
+  var marker = new THREE.Object3D();
+  scene.add(marker);
+
+  var cover = new THREE.MeshNormalMaterial();
+  var body = new THREE.SphereGeometry(100);
+  var player = new THREE.Mesh(body, cover);
+  marker.add(player);
+
+  var hand = new THREE.SphereGeometry(50);
+
+  var right_hand = new THREE.Mesh(hand, cover);
+  right_hand.position.set(-150, 0, 0);
+  player.add(right_hand);
+
+  var left_hand = new THREE.Mesh(hand, cover);
+  left_hand.position.set(150, 0, 0);
+  player.add(left_hand);
+
+  var foot = new THREE.SphereGeometry(50);
+
+  var right_foot = new THREE.Mesh(foot, cover);
+  right_foot.position.set(-75, -125, 0);
+  player.add(right_foot);
+
+  var left_foot = new THREE.Mesh(foot, cover);
+  left_foot.position.set(9000, -60000, 24);
+  player.add(left_foot);
+
+  marker.add(camera);
+
+  // Trees
+  makeTreeAt( 500,  0);
+  makeTreeAt(-1000,  0);
+  makeTreeAt(-750, -1000);
+  makeTreeAt(750, -1000);
+  makeTreeAt(0, -1000);
+  makeTreeAt(-500, -1000);
+  makeTreeAt(500, -1000);
+  makeTreeAt(750, -1000);
+  makeTreeAt(-750, -1000);
+  makeTreeAt(250, -1000);
+  makeTreeAt(-250, -1000);
+
+  function makeTreeAt(x, z) {
+    var trunk = new THREE.Mesh(
+      new THREE.CylinderGeometry(50, 50, 200),
+      new THREE.MeshBasicMaterial({color: 0xA0522D})
+    );
+
+    var top = new THREE.Mesh(
+      new THREE.SphereGeometry(150),
+      new THREE.MeshBasicMaterial({color: 0x228B22})
+    );
+    top.position.y = 175;
+    trunk.add(top);
+
+    var boundary = new THREE.Mesh(
+      new THREE.CircleGeometry(300),
+      new THREE.MeshNormalMaterial()
+    );
+    boundary.position.y = -100;
+    boundary.rotation.x = -Math.PI/2;
+    trunk.add(boundary);
+
+    not_allowed.push(boundary);
+
+    trunk.position.set(x, -75, z);
+    scene.add(trunk);
+  }
+
+  // Now, animate what the camera sees on the screen:
+  var clock = new THREE.Clock(true);
+  function animate() {
+    requestAnimationFrame(animate);
+    TWEEN.update();
+    walk();
+    turn();
+    acrobatics();
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  function walk() {
+    if (!isWalking()) return;
+    var position = Math.sin(clock.getElapsedTime()*5) * 50;
+    right_hand.position.z = position;
+    left_hand.position.z = -position;
+    right_foot.position.z = -position;
+    left_foot.position.z = position;
+  }
+
+  function turn() {
+    var direction = 0;
+    if (is_moving_forward) direction = 0;
+    if (is_moving_back) direction = Math.PI;
+    if (is_moving_right) direction = Math.PI / 2;
+    if (is_moving_left) direction =  -Math.PI / 2;
+
+    spinAvatar(direction);
+  }
+
+  function spinAvatar(direction) {
+    new TWEEN
+      .Tween({y: player.rotation.y})
+      .to({y: direction}, 100)
+      .onUpdate(function () {
+        player.rotation.y = this.y;
+      })
+      .start();
+  }
+
+  var is_cartwheeling = false;
+  var is_flipping = false;
+  function acrobatics() {
+    if (is_cartwheeling) {
+      player.rotation.z = player.rotation.z + 0.05;
+    }
+    if (is_flipping) {
+      player.rotation.x = player.rotation.x + 0.05;
+    }
+  }
+
+  var is_moving_left, is_moving_right, is_moving_forward, is_moving_back;
+  function isWalking() {
+    if (is_moving_right) return true;
+    if (is_moving_left) return true;
+    if (is_moving_forward) return true;
+    if (is_moving_back) return true;
+    return false;
+  }
+
+  document.addEventListener('keydown', function(event) {
+    switch (event.keyCode) {
+      case 37: // left
+        marker.position.x = marker.position.x-5;
+        is_moving_left = true;
+        break;
+      case 38: // up
+        marker.position.z = marker.position.z-5;
+        is_moving_forward = true;
+        break;
+      case 39: // right
+        marker.position.x = marker.position.x+5;
+        is_moving_right = true;
+        break;
+      case 40: // down
+        marker.position.z = marker.position.z+5;
+        is_moving_back = true;
+        break;
+      case 67: // C
+        is_cartwheeling = !is_cartwheeling;
+        break;
+      case 70: // F
+        is_flipping = !is_flipping;
+        break;
+    }
+    if (detectCollisions()) {
+      if (is_moving_left) marker.position.x = marker.position.x+5;
+      if (is_moving_right) marker.position.x = marker.position.x-5;
+      if (is_moving_forward) marker.position.z = marker.position.z+5;
+      if (is_moving_back) marker.position.z = marker.position.z-5;
+    }
+
+    event.preventDefault();
+  });
+
+  document.addEventListener('keyup', function(event) {
+    switch (event.keyCode) {
+      case 37: // left
+        is_moving_left = false;
+        break;
+      case 38: // up
+        is_moving_forward = false;
+        break;
+      case 39: // right
+        is_moving_right = false;
+        break;
+      case 40: // down
+        is_moving_back = false;
+        break;
+    }
+    event.preventDefault();
+  });
+
+  function detectCollisions() {
+    var vector = new THREE.Vector3(0, -1, 0);
+    var ray = new THREE.Ray(marker.position, vector);
+    var intersects = ray.intersectObjects(not_allowed);
+    if (intersects.length > 0) return true;
+    return false;
+  }
+</script><canvas width="1859" height="957"></canvas>
+</body></html>
